@@ -1,4 +1,8 @@
 import React, { useState, useRef } from 'react';
+// Reverting to the specific import path for Dialog.
+// The "Module not found: primereact/dialog" error on Vercel likely indicates
+// an issue with dependency installation (ensure 'primereact' is in 'dependencies' in package.json)
+// or Vercel's build environment/cache, rather than the import path itself.
 import { Dialog } from 'primereact/dialog';
 import { Button } from 'primereact/button';
 import { InputText } from 'primereact/inputtext';
