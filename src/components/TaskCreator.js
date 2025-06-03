@@ -137,6 +137,8 @@ const customStyles = `
         padding: 1rem 2rem; /* Larger button */
         font-size: 1.25rem;
     }
+
+    /* Removed .dropdown-separator as per user request */
 `;
 
 /**
@@ -151,7 +153,7 @@ const TaskCreator = () => {
     // State variables for managing dialog visibility and form data
     const [visible, setVisible] = useState(false); // Controls the main "Create Task" dialog visibility
     const [workTypeModalVisible, setWorkTypeModalVisible] = useState(false); // Controls the "Create/Edit Work Type" modal visibility
-    const [manageWorkTypesVisible, setManageWorkTypesVisible] = useState(false); // Controls the "Manage Work Types" dialog visibility
+    // Removed: const [manageWorkTypesVisible, setManageWorkTypesVisible] = useState(false);
     const [linkedItemsVisible, setLinkedItemsVisible] = useState(false); // Placeholder for a future "Link Items" modal
     const [createAnother, setCreateAnother] = useState(false); // Checkbox state for creating another task after submission
     const [iconPickerVisible, setIconPickerVisible] = useState(false); // Controls the "Choose an icon" modal visibility
@@ -265,19 +267,40 @@ const TaskCreator = () => {
 
     const workTypeOptionTemplate = (option) => {
         if (!option) return <span>Select work type</span>;
+
+        // Handle special options for create/edit
+        if (option.id === 'create-new-work-type') {
+            return (
+                <div className="flex align-items-center gap-2 text-primary">
+                    <i className="pi pi-plus"></i>
+                    <span>{option.name}</span>
+                </div>
+            );
+        }
+        if (option.id === 'edit-selected-work-type') {
+            return (
+                <div className={`flex align-items-center gap-2 ${!formData.workType ? 'text-500-italic' : 'text-primary'}`}>
+                    <i className="pi pi-pencil"></i>
+                    <span>{option.name}</span>
+                </div>
+            );
+        }
+
+        // Default rendering for actual work types
         return (
             <div className="flex align-items-center gap-2">
-                {option.icon.startsWith('pi pi-') ? (
+                {/* Safely access option.icon using optional chaining or a conditional check */}
+                {option.icon && (option.icon.startsWith('pi pi-') ? (
                     <i className={`${option.icon} text-xl`} style={{ color: option.color }}></i>
                 ) : option.icon.startsWith('data:image/') ? ( // Render image if it's a base64 string
                     <img src={option.icon} alt="icon" className="w-1.5rem h-1.5rem" />
                 ) : (
                     <Avatar
-                        label={option.icon}
+                        label={option.icon} // This might be undefined or empty for new items, handle gracefully
                         size="small"
                         style={{ backgroundColor: option.color, color: 'white' }}
                     />
-                )}
+                ))}
                 <span>{option.name}</span>
             </div>
         );
@@ -312,6 +335,29 @@ const TaskCreator = () => {
 
     // Event handlers
     const handleInputChange = (field, value) => {
+        // Special handling for workType dropdown to trigger modals
+        if (field === 'workType') {
+            if (value && value.id === 'create-new-work-type') {
+                openCreateWorkType();
+                // Reset dropdown to previous value or a default after action
+                setFormData(prev => ({ ...prev, workType: workTypes.find(wt => wt.id === 'task') || workTypes[0] }));
+                return;
+            }
+            if (value && value.id === 'edit-selected-work-type') {
+                if (formData.workType && formData.workType.id) {
+                    openEditWorkType(formData.workType);
+                } else {
+                    toast.current.show({
+                        severity: 'warn',
+                        summary: 'No Work Type Selected',
+                        detail: 'Please select a work type to edit.'
+                    });
+                }
+                // Reset dropdown to previous value or a default after action
+                setFormData(prev => ({ ...prev, workType: workTypes.find(wt => wt.id === 'task') || workTypes[0] }));
+                return;
+            }
+        }
         setFormData(prev => ({ ...prev, [field]: value }));
         if (errors[field]) {
             setErrors(prev => ({ ...prev, [field]: null }));
@@ -526,6 +572,14 @@ const TaskCreator = () => {
         setIconPickerVisible(false); // Close the icon picker
     };
 
+    // Prepare dropdown options including special actions
+    const dropdownWorkTypes = [
+        ...workTypes,
+        // Removed separator option as per user request
+        { name: 'Create New Work Type...', id: 'create-new-work-type' },
+        { name: 'Edit Selected Work Type...', id: 'edit-selected-work-type' }
+    ];
+
     return (
         <div className="p-4">
             {/* Inject custom styles */}
@@ -568,7 +622,7 @@ const TaskCreator = () => {
                         </div>
 
                         {/* Project Selection Field */}
-                        <div className="field col-12 mb-4">
+                        <div className="field col-12 mb-3"> {/* Changed from mb-4 to mb-3 */}
                             <label htmlFor="project" className="block text-900 font-medium mb-2">
                                 Project <span className="text-red-500">*</span>
                             </label>
@@ -584,42 +638,18 @@ const TaskCreator = () => {
                             />
                         </div>
 
-                        {/* Work Type Selection and Management Field */}
+                        {/* Work Type Selection Field with integrated actions */}
                         <div className="field col-12 mb-4">
-                            <div className="flex justify-content-between align-items-center mb-2">
-                                <label htmlFor="workType" className="block text-900 font-medium">
-                                    Work type <span className="text-red-500">*</span>
-                                </label>
-                                <div className="flex gap-2"> {/* Added gap for buttons */}
-                                    {/* Edit button for the currently selected work type */}
-                                    <Button
-                                        icon="pi pi-pencil"
-                                        className="p-button-text p-button-sm"
-                                        tooltip="Edit selected work type"
-                                        onClick={() => openEditWorkType(formData.workType)}
-                                        disabled={!formData.workType || !formData.workType.id} // Disable if no work type is selected
-                                    />
-                                    <Button
-                                        icon="pi pi-plus"
-                                        className="p-button-text p-button-sm"
-                                        tooltip="Create new work type"
-                                        onClick={openCreateWorkType}
-                                    />
-                                    <Button
-                                        icon="pi pi-cog"
-                                        className="p-button-text p-button-sm"
-                                        tooltip="Manage all work types"
-                                        onClick={() => setManageWorkTypesVisible(true)}
-                                    />
-                                </div>
-                            </div>
+                            <label htmlFor="workType" className="block text-900 font-medium mb-2">
+                                Work type <span className="text-red-500">*</span>
+                            </label>
                             <Dropdown
                                 id="workType"
                                 value={formData.workType}
-                                options={workTypes}
+                                options={dropdownWorkTypes} // Use the combined list with special actions
                                 onChange={(e) => handleInputChange('workType', e.value)}
                                 optionLabel="name"
-                                itemTemplate={workTypeOptionTemplate}
+                                itemTemplate={workTypeOptionTemplate} // Custom template for rendering options
                                 valueTemplate={workTypeOptionTemplate}
                                 className="w-full"
                             />
@@ -1020,60 +1050,11 @@ const TaskCreator = () => {
                 </div>
             </Dialog>
 
-            {/* Manage Work Types Dialog */}
-            <Dialog
-                header="Manage Work Types"
-                visible={manageWorkTypesVisible}
-                style={{ width: '600px' }}
-                onHide={() => setManageWorkTypesVisible(false)}
-                modal
-            >
-                <DataTable value={workTypes} className="mb-4">
-                    <Column
-                        field="icon"
-                        header="Icon"
-                        body={(rowData) => (
-                            rowData.icon.startsWith('pi pi-') ? (
-                                <i className={`${rowData.icon} text-xl`} style={{ color: rowData.color }}></i>
-                            ) : rowData.icon.startsWith('data:image/') ? (
-                                <img src={rowData.icon} alt="icon" className="w-1.5rem h-1.5rem" />
-                            ) : (
-                                <Avatar
-                                    label={rowData.icon}
-                                    size="small"
-                                    style={{ backgroundColor: rowData.color, color: 'white' }}
-                                />
-                            )
-                        )}
-                    />
-                    <Column field="name" header="Name" />
-                    <Column field="description" header="Description" />
-                    <Column
-                        header="Actions"
-                        body={(rowData) => (
-                            <div className="flex gap-2">
-                                <Button
-                                    icon="pi pi-pencil"
-                                    className="p-button-text p-button-sm"
-                                    onClick={() => openEditWorkType(rowData)}
-                                />
-                                <Button
-                                    icon="pi pi-trash"
-                                    className="p-button-text p-button-sm p-button-danger"
-                                    onClick={() => deleteWorkType(rowData)}
-                                />
-                            </div>
-                        )}
-                    />
-                </DataTable>
-
-                <Button
-                    label="Add New Work Type"
-                    icon="pi pi-plus"
-                    className="p-button-primary w-full"
-                    onClick={openCreateWorkType}
-                />
-            </Dialog>
+            {/* Removed Manage Work Types Dialog - as per user request */}
+            {/* The component for Manage Work Types is no longer rendered.
+                If you need to re-introduce it, you can uncomment this block and
+                add a way to open it (e.g., via a button in the main app).
+            */}
 
             {/* Choose an Icon Modal */}
             <Dialog
